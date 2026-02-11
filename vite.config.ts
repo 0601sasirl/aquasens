@@ -8,6 +8,7 @@ export default defineConfig({
 	  plugins: [
 	    ...mochaPlugins(process.env as any),
 	    react(),
+	  ]	
 	  server: {
 	    allowedHosts: true,
 	  },
