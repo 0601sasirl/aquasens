@@ -8,9 +8,9 @@ export default defineConfig({
 	  plugins: [
 	    ...mochaPlugins(process.env as any),
 	    react(),
-	  ]	
+	  ],
 	  server: {
-	    allowedHosts: true,
+	      allowedHosts: true,
 	  },
   build: {
     chunkSizeWarningLimit: 5000,
