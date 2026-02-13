@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Dialog as DialogPrimitive } from "radix-ui"
+import { Dialog as DialogPrimitive } from "@radix-ui/react-dialog"
 
 import { cn } from "@/react-app/lib/utils"
 import { Button } from "@/react-app/components/ui/button"
