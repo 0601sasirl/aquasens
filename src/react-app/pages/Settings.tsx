@@ -1,10 +1,88 @@
 import { useState } from 'react';
 import { useSettings } from '@/react-app/contexts/SettingsContext';
-import { Info, Droplets, Moon, Zap, Thermometer, Radio, X } from 'lucide-react';
+import { Info, Droplets, Moon, Zap, Thermometer, Radio, X, Wifi, CheckCircle, XCircle } from 'lucide-react';
 
 export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const [showESP32Modal, setShowESP32Modal] = useState(false);
+  const [connectionTab, setConnectionTab] = useState<'bluetooth' | 'wifi'>('bluetooth');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
+  const [deviceName, setDeviceName] = useState('');
+  const [wifiSSID, setWifiSSID] = useState('');
+  const [wifiPassword, setWifiPassword] = useState('');
+
+  // Bluetooth Connection
+  const connectViaBluetooth = async () => {
+    setIsConnecting(true);
+    setConnectionStatus('connecting');
+
+    try {
+      // Check if Web Bluetooth API is supported
+      if (!navigator.bluetooth) {
+        alert('Bluetooth is not supported on this browser. Please use Chrome, Edge, or Opera on desktop/Android.');
+        setConnectionStatus('failed');
+        setIsConnecting(false);
+        return;
+      }
+
+      // Request Bluetooth device
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: 'ESP32' },
+          { namePrefix: 'AquaSens' }
+        ],
+        optionalServices: ['battery_service', 'device_information']
+      });
+
+      console.log('Selected device:', device.name);
+      setDeviceName(device.name || 'Unknown Device');
+
+      // Connect to GATT Server
+      const server = await device.gatt?.connect();
+      console.log('Connected to GATT server');
+
+      setConnectionStatus('connected');
+      
+      // Switch to real sensor mode
+      updateSettings({ demoMode: false });
+
+      // Show success message
+      setTimeout(() => {
+        setShowESP32Modal(false);
+        setConnectionStatus('idle');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Bluetooth connection error:', error);
+      setConnectionStatus('failed');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // WiFi Connection (simulated for now - requires backend)
+  const connectViaWiFi = async () => {
+    if (!wifiSSID) {
+      alert('Please enter ESP32 WiFi network name');
+      return;
+    }
+
+    setIsConnecting(true);
+    setConnectionStatus('connecting');
+
+    // Simulate WiFi connection (you'll need to implement actual WiFi connection with your ESP32)
+    setTimeout(() => {
+      setConnectionStatus('connected');
+      setDeviceName(`WiFi: ${wifiSSID}`);
+      updateSettings({ demoMode: false });
+      
+      setTimeout(() => {
+        setShowESP32Modal(false);
+        setConnectionStatus('idle');
+      }, 2000);
+    }, 2000);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
@@ -164,7 +242,7 @@ export default function Settings() {
               <div className="text-left">
                 <h3 className="font-medium text-gray-900 dark:text-white">Connect ESP32</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Real-time sensor integration
+                  {deviceName || 'Real-time sensor integration'}
                 </p>
               </div>
             </div>
@@ -216,7 +294,10 @@ export default function Settings() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowESP32Modal(false)}
+                  onClick={() => {
+                    setShowESP32Modal(false);
+                    setConnectionStatus('idle');
+                  }}
                   className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -224,51 +305,169 @@ export default function Settings() {
               </div>
             </div>
 
+            {/* Connection Status */}
+            {connectionStatus === 'connected' && (
+              <div className="bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 p-4">
+                <div className="flex items-center gap-3 text-green-700 dark:text-green-300">
+                  <CheckCircle className="w-5 h-5" />
+                  <div>
+                    <p className="font-medium">Connected to {deviceName}</p>
+                    <p className="text-sm">Switching to real sensor mode...</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {connectionStatus === 'failed' && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 p-4">
+                <div className="flex items-center gap-3 text-red-700 dark:text-red-300">
+                  <XCircle className="w-5 h-5" />
+                  <div>
+                    <p className="font-medium">Connection Failed</p>
+                    <p className="text-sm">Please try again</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tabs */}
             <div className="flex border-b border-gray-200 dark:border-gray-700">
-              <button className="flex-1 flex items-center justify-center gap-2 py-4 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 font-medium">
+              <button
+                onClick={() => setConnectionTab('bluetooth')}
+                className={`flex-1 flex items-center justify-center gap-2 py-4 font-medium transition-colors ${
+                  connectionTab === 'bluetooth'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
                 <Radio className="w-4 h-4" />
                 Bluetooth
               </button>
-              <button className="flex-1 flex items-center justify-center gap-2 py-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                </svg>
+              <button
+                onClick={() => setConnectionTab('wifi')}
+                className={`flex-1 flex items-center justify-center gap-2 py-4 font-medium transition-colors ${
+                  connectionTab === 'wifi'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Wifi className="w-4 h-4" />
                 WiFi
               </button>
             </div>
 
             {/* Content */}
             <div className="p-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 mb-6">
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
-                  <Radio className="w-4 h-4" />
-                  Bluetooth Instructions:
-                </h3>
-                <ol className="space-y-2 text-sm text-blue-700 dark:text-blue-300">
-                  <li>1. Make sure Bluetooth is enabled on your device</li>
-                  <li>2. Power on your ESP32 with sensors</li>
-                  <li>3. Click "Connect via Bluetooth" below</li>
-                  <li>4. Select "ESP32" or "AquaSens" from the list</li>
-                </ol>
-              </div>
+              {connectionTab === 'bluetooth' ? (
+                <>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 mb-6">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                      <Radio className="w-4 h-4" />
+                      Bluetooth Instructions:
+                    </h3>
+                    <ol className="space-y-2 text-sm text-blue-700 dark:text-blue-300">
+                      <li>1. Make sure Bluetooth is enabled on your device</li>
+                      <li>2. Power on your ESP32 with sensors</li>
+                      <li>3. Click "Connect via Bluetooth" below</li>
+                      <li>4. Select "ESP32" or "AquaSens" from the list</li>
+                    </ol>
+                  </div>
 
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 rounded-xl transition-colors flex items-center justify-center gap-2 mb-3">
-                <Radio className="w-5 h-5" />
-                Connect via Bluetooth
-              </button>
+                  <button
+                    onClick={connectViaBluetooth}
+                    disabled={isConnecting}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-4 rounded-xl transition-colors flex items-center justify-center gap-2 mb-3"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Radio className="w-5 h-5" />
+                        Connect via Bluetooth
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 flex items-center justify-center gap-1">
+                    <Radio className="w-3 h-3" />
+                    Works on Chrome, Edge, Opera (Desktop/Android)
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-xl p-4 mb-6">
+                    <h3 className="font-semibold text-cyan-900 dark:text-cyan-100 mb-3 flex items-center gap-2">
+                      <Wifi className="w-4 h-4" />
+                      WiFi Instructions:
+                    </h3>
+                    <ol className="space-y-2 text-sm text-cyan-700 dark:text-cyan-300">
+                      <li>1. Power on your ESP32 (creates WiFi hotspot)</li>
+                      <li>2. Look for network starting with "AquaSens" or "ESP32"</li>
+                      <li>3. Enter the network name and password below</li>
+                      <li>4. Click "Connect via WiFi"</li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ESP32 Network Name (SSID)
+                      </label>
+                      <input
+                        type="text"
+                        value={wifiSSID}
+                        onChange={(e) => setWifiSSID(e.target.value)}
+                        placeholder="e.g., AquaSens_123"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Password (if required)
+                      </label>
+                      <input
+                        type="password"
+                        value={wifiPassword}
+                        onChange={(e) => setWifiPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={connectViaWiFi}
+                    disabled={isConnecting}
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white font-medium py-4 rounded-xl transition-colors flex items-center justify-center gap-2 mb-3"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Wifi className="w-5 h-5" />
+                        Connect via WiFi
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
 
               <button
-                onClick={() => setShowESP32Modal(false)}
-                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-4 rounded-xl transition-colors"
+                onClick={() => {
+                  setShowESP32Modal(false);
+                  setConnectionStatus('idle');
+                }}
+                disabled={isConnecting}
+                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300 font-medium py-4 rounded-xl transition-colors"
               >
                 Cancel
               </button>
-
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4 flex items-center justify-center gap-1">
-                <Radio className="w-3 h-3" />
-                Works on phones and tablets with Bluetooth
-              </p>
             </div>
           </div>
         </div>
