@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '@/react-app/contexts/SettingsContext';
-import { Droplets, Activity, Beaker, Thermometer } from 'lucide-react';
+import { Droplets, Activity, Beaker, Thermometer, AlertTriangle, Bell, BellOff } from 'lucide-react';
 import Logo, { WaterWaveIllustration } from '../components/Logo';
 
 interface SensorData {
@@ -8,6 +8,14 @@ interface SensorData {
   tds: number;
   turbidity: number;
   temperature: number;
+}
+
+interface Alert {
+  id: string;
+  timestamp: Date;
+  type: 'ph' | 'tds' | 'turbidity' | 'temperature';
+  message: string;
+  severity: 'warning' | 'danger';
 }
 
 export default function Dashboard() {
@@ -20,6 +28,60 @@ export default function Dashboard() {
   });
   const [qualityScore, setQualityScore] = useState(85);
   const [isLoading, setIsLoading] = useState(true);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [alertsEnabled, setAlertsEnabled] = useState(true);
+
+  // Check if water quality is safe
+  const checkWaterSafety = (data: SensorData) => {
+    const newAlerts: Alert[] = [];
+
+    // pH check (safe range: 6.5-8.5)
+    if (data.ph < 6.5 || data.ph > 8.5) {
+      newAlerts.push({
+        id: `ph-${Date.now()}`,
+        timestamp: new Date(),
+        type: 'ph',
+        message: `pH level ${data.ph} is outside safe range (6.5-8.5)`,
+        severity: data.ph < 6.0 || data.ph > 9.0 ? 'danger' : 'warning'
+      });
+    }
+
+    // TDS check (safe: <300 ppm)
+    if (data.tds > 300) {
+      newAlerts.push({
+        id: `tds-${Date.now()}`,
+        timestamp: new Date(),
+        type: 'tds',
+        message: `TDS level ${data.tds} ppm exceeds safe limit (300 ppm)`,
+        severity: data.tds > 500 ? 'danger' : 'warning'
+      });
+    }
+
+    // Turbidity check (safe: <5 NTU)
+    if (data.turbidity > 5) {
+      newAlerts.push({
+        id: `turbidity-${Date.now()}`,
+        timestamp: new Date(),
+        type: 'turbidity',
+        message: `Water turbidity ${data.turbidity} NTU is too high (>5 NTU)`,
+        severity: data.turbidity > 10 ? 'danger' : 'warning'
+      });
+    }
+
+    // Temperature check (safe: 15-25°C)
+    if (data.temperature < 15 || data.temperature > 25) {
+      newAlerts.push({
+        id: `temp-${Date.now()}`,
+        timestamp: new Date(),
+        type: 'temperature',
+        message: `Temperature ${data.temperature}°C is outside normal range (15-25°C)`,
+        severity: 'warning'
+      });
+    }
+
+    return newAlerts;
+  };
 
   useEffect(() => {
     if (!settings.demoMode) return;
@@ -27,18 +89,49 @@ export default function Dashboard() {
     setTimeout(() => setIsLoading(false), 1500);
 
     const interval = setInterval(() => {
-      setSensorData({
-        ph: +(7.0 + Math.random() * 0.5).toFixed(2),
-        tds: +(240 + Math.random() * 20).toFixed(1),
-        turbidity: +(2.0 + Math.random() * 1.0).toFixed(2),
+      // Simulate occasional unsafe values for demo
+      const randomEvent = Math.random();
+      const newData = {
+        ph: randomEvent < 0.1 ? +(5.5 + Math.random() * 1).toFixed(2) : +(7.0 + Math.random() * 0.5).toFixed(2),
+        tds: randomEvent < 0.1 ? +(350 + Math.random() * 150).toFixed(1) : +(240 + Math.random() * 20).toFixed(1),
+        turbidity: randomEvent < 0.1 ? +(6.0 + Math.random() * 4).toFixed(2) : +(2.0 + Math.random() * 1.0).toFixed(2),
         temperature: +(24 + Math.random() * 2).toFixed(1)
-      });
-      
-      setQualityScore(80 + Math.floor(Math.random() * 15));
+      };
+
+      setSensorData(newData);
+
+      // Check for safety issues
+      const newAlerts = checkWaterSafety(newData);
+      if (newAlerts.length > 0 && alertsEnabled) {
+        setAlerts(prev => [...newAlerts, ...prev].slice(0, 10)); // Keep last 10 alerts
+        
+        // Browser notification
+        if (Notification.permission === 'granted') {
+          new Notification('⚠️ Water Quality Alert', {
+            body: newAlerts[0].message,
+            icon: '/favicon.ico'
+          });
+        }
+      }
+
+      // Calculate quality score
+      let score = 100;
+      if (newData.ph < 6.5 || newData.ph > 8.5) score -= 20;
+      if (newData.tds > 300) score -= 20;
+      if (newData.turbidity > 5) score -= 20;
+      if (newData.temperature < 15 || newData.temperature > 25) score -= 10;
+      setQualityScore(Math.max(0, score));
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [settings.demoMode]);
+  }, [settings.demoMode, alertsEnabled]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const getQualityStatus = (score: number) => {
     if (score >= 80) return { label: 'Excellent', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20', ring: 'ring-green-500' };
@@ -48,6 +141,7 @@ export default function Dashboard() {
   };
 
   const status = getQualityStatus(qualityScore);
+  const hasActiveAlerts = alerts.length > 0;
 
   if (isLoading) {
     return (
@@ -65,20 +159,120 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
+      {/* Header with Logo and Alert Bell */}
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Logo size="lg" />
           
-          {settings.demoMode && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Demo Mode</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {settings.demoMode && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Demo Mode</span>
+              </div>
+            )}
+            
+            {/* Alert Bell */}
+            <button
+              onClick={() => setShowAlerts(!showAlerts)}
+              className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            >
+              {alertsEnabled ? (
+                <Bell className={`w-6 h-6 ${hasActiveAlerts ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`} />
+              ) : (
+                <BellOff className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+              )}
+              {hasActiveAlerts && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {alerts.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Alerts Dropdown */}
+        {showAlerts && (
+          <div className="absolute right-4 top-16 w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                Alerts ({alerts.length})
+              </h3>
+              <button
+                onClick={() => setAlertsEnabled(!alertsEnabled)}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {alertsEnabled ? 'Disable' : 'Enable'}
+              </button>
+            </div>
+            
+            <div className="max-h-96 overflow-y-auto">
+              {alerts.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                  <Droplets className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No alerts. Water quality is safe!</p>
+                </div>
+              ) : (
+                alerts.map(alert => (
+                  <div
+                    key={alert.id}
+                    className={`p-4 border-b border-gray-100 dark:border-gray-700 ${
+                      alert.severity === 'danger'
+                        ? 'bg-red-50 dark:bg-red-900/20'
+                        : 'bg-yellow-50 dark:bg-yellow-900/20'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle
+                        className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                          alert.severity === 'danger'
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-yellow-600 dark:text-yellow-400'
+                        }`}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {alert.message}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {alert.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {alerts.length > 0 && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50">
+                <button
+                  onClick={() => setAlerts([])}
+                  className="w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  Clear all alerts
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Active Alert Banner */}
+      {hasActiveAlerts && (
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 animate-pulse" />
+            <p className="font-medium">
+              ⚠️ Water quality alert: {alerts[0].message}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Rest of your Dashboard code stays the same... */}
         <div className="relative">
           <div className="absolute inset-0 overflow-hidden rounded-3xl">
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl"></div>
@@ -154,6 +348,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Sensor Cards Grid - keeping your existing code */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600">
             <div className="p-6">
