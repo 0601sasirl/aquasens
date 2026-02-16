@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Droplet, Thermometer, Activity, AlertTriangle, Wifi, WifiOff, Waves, Beaker } from "lucide-react";
+import { Droplet, Thermometer, Activity, Wifi, WifiOff, Waves, Beaker } from "lucide-react";
+import { useSettings } from "@/react-app/contexts/SettingsContext";
 
 interface SensorData {
   ph: number;
@@ -16,6 +17,8 @@ interface PurityResult {
 }
 
 export default function Dashboard() {
+  const { settings } = useSettings();
+  
   const [sensorData, setSensorData] = useState<SensorData>({
     ph: 7.2,
     tds: 150,
@@ -27,10 +30,9 @@ export default function Dashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [historicalData, setHistoricalData] = useState<SensorData[]>([]);
-  const [demoMode] = useState(true); // We'll connect this to Settings later
 
   useEffect(() => {
-    if (demoMode) {
+    if (settings.demoMode) {
       const connectToDemo = async () => {
         setIsConnected(true);
         
@@ -45,40 +47,39 @@ export default function Dashboard() {
           
           setSensorData(newData);
           setHistoricalData(prev => [...prev.slice(-19), newData]);
-        }, 5000); // Update every 5 seconds
+        }, 5000);
 
         return () => clearInterval(interval);
       };
 
       connectToDemo();
+    } else {
+      setIsConnected(false);
+      console.log('Hardware mode: Bluetooth connection would be initiated here');
     }
-  }, [demoMode]);
+  }, [settings.demoMode]);
 
   const calculatePurity = (): PurityResult => {
     let score = 100;
     
-    // pH penalties
     if (sensorData.ph < 6.5 || sensorData.ph > 8.5) {
       score -= 30;
     } else if (sensorData.ph < 6.0 || sensorData.ph > 9.0) {
       score -= 50;
     }
     
-    // TDS penalties
     if (sensorData.tds > 500) {
       score -= 40;
     } else if (sensorData.tds > 300) {
       score -= 20;
     }
     
-    // Turbidity penalties
     if (sensorData.turbidity > 5) {
       score -= 40;
     } else if (sensorData.turbidity > 3) {
       score -= 15;
     }
     
-    // Temperature penalties
     if (sensorData.temperature < 15 || sensorData.temperature > 30) {
       score -= 10;
     }
@@ -125,7 +126,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 dark:from-slate-950 dark:via-blue-950 dark:to-cyan-950 pb-24 overflow-hidden relative">
-      {/* Animated background bubbles */}
       <div className="absolute inset-0 overflow-hidden opacity-20 pointer-events-none">
         <div className="absolute top-20 left-10 w-32 h-32 bg-cyan-400 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute top-40 right-20 w-40 h-40 bg-blue-400 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -134,7 +134,6 @@ export default function Dashboard() {
       </div>
 
       <div className="relative z-10 p-6 max-w-md mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">
@@ -147,7 +146,7 @@ export default function Dashboard() {
               <>
                 <Wifi className="w-5 h-5 text-green-500 animate-pulse" />
                 <span className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full shadow-lg shadow-green-500/50">
-                  {demoMode ? "Demo" : "Connected"}
+                  {settings.demoMode ? "Demo" : "Connected"}
                 </span>
               </>
             ) : (
@@ -159,12 +158,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Circular Purity Gauge */}
         <div className="relative">
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-cyan-200 dark:border-cyan-800">
             <div className="flex flex-col items-center">
               <div className="relative w-48 h-48">
-                {/* Circular progress */}
                 <svg className="transform -rotate-90 w-48 h-48">
                   <circle
                     cx="96"
@@ -200,7 +197,6 @@ export default function Dashboard() {
                   />
                 </svg>
                 
-                {/* Center text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <div className={`text-5xl font-bold ${getStatusColor(purity.status)} transition-all duration-500`}>
                     {Math.round(purity.score)}
@@ -209,7 +205,6 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              {/* Status label */}
               <div className="mt-6 text-center">
                 <div className={`text-2xl font-bold ${getStatusColor(purity.status)} transition-all duration-500`}>
                   {purity.label}
@@ -219,7 +214,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Usability Status Card */}
         <div className={`rounded-3xl p-6 shadow-2xl border-2 transition-all duration-500 ${
           purity.status === "safe" 
             ? "bg-green-50 dark:bg-green-900/20 border-green-500 shadow-green-500/50" 
@@ -242,9 +236,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Sensor Grid 2x2 */}
         <div className="grid grid-cols-2 gap-4">
-          {/* pH Card */}
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-5 shadow-xl border border-blue-200 dark:border-blue-800 hover:shadow-2xl transition-all">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -264,7 +256,6 @@ export default function Dashboard() {
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optimal: 6.5-8.5</div>
           </div>
 
-          {/* TDS Card */}
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-5 shadow-xl border border-cyan-200 dark:border-cyan-800 hover:shadow-2xl transition-all">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
@@ -284,7 +275,6 @@ export default function Dashboard() {
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">ppm</div>
           </div>
 
-          {/* Turbidity Card */}
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-5 shadow-xl border border-teal-200 dark:border-teal-800 hover:shadow-2xl transition-all">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center">
@@ -304,7 +294,6 @@ export default function Dashboard() {
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">NTU</div>
           </div>
 
-          {/* Temperature Card */}
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-5 shadow-xl border border-orange-200 dark:border-orange-800 hover:shadow-2xl transition-all">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
@@ -325,7 +314,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Start Test Button */}
         <button
           onClick={handleStartTest}
           disabled={isTesting}
