@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router';
-import { Home, Map, BookOpen, Settings } from 'lucide-react';
+import { Home, Map, BookOpen, Shield, Settings } from 'lucide-react';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
   { path: '/map', icon: Map, label: 'Map' },
   { path: '/guide', icon: BookOpen, label: 'Guide' },
+  { path: '/features', icon: Shield, label: 'Features' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -18,7 +19,7 @@ export default function BottomNav() {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 ${
+                `flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 ${
                   isActive
                     ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-900/50'
                     : 'text-muted-foreground hover:text-cyan-600 dark:hover:text-cyan-400'
@@ -28,7 +29,7 @@ export default function BottomNav() {
               {({ isActive }) => (
                 <>
                   <item.icon
-                    className={`w-6 h-6 transition-transform ${
+                    className={`w-5 h-5 transition-transform ${
                       isActive ? 'scale-110' : 'scale-100'
                     }`}
                   />
