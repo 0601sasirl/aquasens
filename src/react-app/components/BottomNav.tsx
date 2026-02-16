@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router';
-import { Home, Map, BookOpen, Shield, Settings } from 'lucide-react';
+import { Home, TrendingUp, BookOpen, Shield, Settings } from 'lucide-react';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
-  { path: '/map', icon: Map, label: 'Map' },
+  { path: '/analytics', icon: TrendingUp, label: 'Analytics' },
   { path: '/guide', icon: BookOpen, label: 'Guide' },
   { path: '/features', icon: Shield, label: 'Features' },
   { path: '/settings', icon: Settings, label: 'Settings' },

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSettings } from '@/react-app/contexts/SettingsContext';
-import { Info, Droplets, Moon, Zap, Thermometer, Radio, X, Wifi, CheckCircle, XCircle } from 'lucide-react';
+import { Info, Droplets, Moon, Zap, Thermometer, Radio, X, Wifi, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 export default function Settings() {
   const { settings, updateSettings } = useSettings();
@@ -11,14 +11,23 @@ export default function Settings() {
   const [deviceName, setDeviceName] = useState('');
   const [wifiSSID, setWifiSSID] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
+  
+  // Calibration state
+  const [lastCalibration, setLastCalibration] = useState<Date>(
+    new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)
+  );
+  const [showCalibrationModal, setShowCalibrationModal] = useState(false);
 
-  // Bluetooth Connection
+  const daysSinceCalibration = Math.floor(
+    (Date.now() - lastCalibration.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const needsCalibration = daysSinceCalibration >= 30;
+
   const connectViaBluetooth = async () => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
 
     try {
-      // Check if Web Bluetooth API is supported
       if (!navigator.bluetooth) {
         alert('Bluetooth is not supported on this browser. Please use Chrome, Edge, or Opera on desktop/Android.');
         setConnectionStatus('failed');
@@ -26,7 +35,6 @@ export default function Settings() {
         return;
       }
 
-      // Request Bluetooth device
       const device = await navigator.bluetooth.requestDevice({
         filters: [
           { namePrefix: 'ESP32' },
@@ -38,16 +46,12 @@ export default function Settings() {
       console.log('Selected device:', device.name);
       setDeviceName(device.name || 'Unknown Device');
 
-      // Connect to GATT Server
       const server = await device.gatt?.connect();
       console.log('Connected to GATT server');
 
       setConnectionStatus('connected');
-      
-      // Switch to real sensor mode
       updateSettings({ demoMode: false });
 
-      // Show success message
       setTimeout(() => {
         setShowESP32Modal(false);
         setConnectionStatus('idle');
@@ -61,7 +65,6 @@ export default function Settings() {
     }
   };
 
-  // WiFi Connection (simulated for now - requires backend)
   const connectViaWiFi = async () => {
     if (!wifiSSID) {
       alert('Please enter ESP32 WiFi network name');
@@ -71,7 +74,6 @@ export default function Settings() {
     setIsConnecting(true);
     setConnectionStatus('connecting');
 
-    // Simulate WiFi connection (you'll need to implement actual WiFi connection with your ESP32)
     setTimeout(() => {
       setConnectionStatus('connected');
       setDeviceName(`WiFi: ${wifiSSID}`);
@@ -231,23 +233,53 @@ export default function Settings() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Actions</h2>
           
-          <button
-            onClick={() => setShowESP32Modal(true)}
-            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200 dark:border-blue-800 rounded-xl hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Radio className="w-5 h-5 text-white" />
+          <div className="space-y-3">
+            {/* ESP32 Connection */}
+            <button
+              onClick={() => setShowESP32Modal(true)}
+              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200 dark:border-blue-800 rounded-xl hover:shadow-md transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Radio className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-medium text-gray-900 dark:text-white">Connect ESP32</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {deviceName || 'Real-time sensor integration'}
+                  </p>
+                </div>
               </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900 dark:text-white">Connect ESP32</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {deviceName || 'Real-time sensor integration'}
-                </p>
+              <span className="text-blue-600 dark:text-blue-400 text-sm font-medium">Configure →</span>
+            </button>
+
+            {/* Calibration */}
+            <button
+              onClick={() => setShowCalibrationModal(true)}
+              className={`w-full flex items-center justify-between p-4 rounded-xl hover:shadow-md transition-all border ${
+                needsCalibration
+                  ? 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-800'
+                  : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 border-gray-200 dark:border-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${needsCalibration ? 'bg-orange-600' : 'bg-gray-600'}`}>
+                  <Thermometer className="w-5 h-5 text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-medium text-gray-900 dark:text-white">Sensor Calibration</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {needsCalibration
+                      ? `⚠️ Due for calibration (${daysSinceCalibration} days)`
+                      : `Last calibrated ${daysSinceCalibration} days ago`}
+                  </p>
+                </div>
               </div>
-            </div>
-            <span className="text-blue-600 dark:text-blue-400 text-sm font-medium">Configure →</span>
-          </button>
+              <span className={`text-sm font-medium ${needsCalibration ? 'text-orange-600 dark:text-orange-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                {needsCalibration ? 'Calibrate Now →' : 'View →'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* About */}
@@ -273,6 +305,42 @@ export default function Settings() {
                 © 2024 AquaSens. All rights reserved.
               </p>
             </div>
+
+            {/* Navigation & Logout Buttons */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <button
+                onClick={() => {
+                  window.location.href = '/pricing';
+                }}
+                className="w-full text-left px-4 py-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 hover:from-blue-100 hover:to-cyan-100 dark:hover:from-blue-900/30 dark:hover:to-cyan-900/30 rounded-xl transition-colors"
+              >
+                <p className="font-medium text-gray-900 dark:text-white">💳 Upgrade to Pro</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Unlock unlimited sensors & advanced features</p>
+              </button>
+
+              <button
+                onClick={() => {
+                  window.location.href = '/api';
+                }}
+                className="w-full text-left px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 rounded-xl transition-colors"
+              >
+                <p className="font-medium text-gray-900 dark:text-white">🔌 API Documentation</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Integrate AquaSens into your applications</p>
+              </button>
+
+              <button
+                onClick={() => {
+                  localStorage.removeItem('aquasens-user');
+                  localStorage.removeItem('aquasens-settings');
+                  localStorage.removeItem('aquasens-onboarding-complete');
+                  window.location.href = '/';
+                }}
+                className="w-full text-left px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl transition-colors"
+              >
+                <p className="font-medium text-red-600 dark:text-red-400">🚪 Sign Out</p>
+                <p className="text-xs text-red-500 dark:text-red-400">Log out of your account</p>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -281,7 +349,6 @@ export default function Settings() {
       {showESP32Modal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-6 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -305,7 +372,6 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Connection Status */}
             {connectionStatus === 'connected' && (
               <div className="bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 p-4">
                 <div className="flex items-center gap-3 text-green-700 dark:text-green-300">
@@ -330,7 +396,6 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Tabs */}
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setConnectionTab('bluetooth')}
@@ -356,7 +421,6 @@ export default function Settings() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-6">
               {connectionTab === 'bluetooth' ? (
                 <>
@@ -467,6 +531,110 @@ export default function Settings() {
                 className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300 font-medium py-4 rounded-xl transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calibration Modal */}
+      {showCalibrationModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Thermometer className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Sensor Calibration</h2>
+                    <p className="text-sm text-orange-100">Keep your readings accurate</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCalibrationModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className={`rounded-xl p-4 mb-6 ${
+                needsCalibration
+                  ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800'
+                  : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {needsCalibration ? (
+                    <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <h3 className={`font-semibold mb-1 ${
+                      needsCalibration
+                        ? 'text-orange-900 dark:text-orange-100'
+                        : 'text-green-900 dark:text-green-100'
+                    }`}>
+                      {needsCalibration ? 'Calibration Overdue' : 'Calibration Status: Good'}
+                    </h3>
+                    <p className={`text-sm ${
+                      needsCalibration
+                        ? 'text-orange-700 dark:text-orange-300'
+                        : 'text-green-700 dark:text-green-300'
+                    }`}>
+                      Last calibrated {daysSinceCalibration} days ago
+                      {needsCalibration && ' - sensors should be calibrated every 30 days'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Calibration Steps:</h3>
+                <ol className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-semibold">1</span>
+                    <span>Prepare pH 7.0 calibration solution</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-semibold">2</span>
+                    <span>Rinse pH sensor with distilled water</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-semibold">3</span>
+                    <span>Immerse sensor in calibration solution</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-semibold">4</span>
+                    <span>Wait for reading to stabilize (2-3 minutes)</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center font-semibold">5</span>
+                    <span>Repeat with pH 4.0 and pH 10.0 solutions</span>
+                  </li>
+                </ol>
+              </div>
+
+              <button
+                onClick={() => {
+                  setLastCalibration(new Date());
+                  setShowCalibrationModal(false);
+                  alert('Calibration marked as complete! ✅');
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 rounded-xl transition-colors mb-3"
+              >
+                Mark as Calibrated
+              </button>
+
+              <button
+                onClick={() => setShowCalibrationModal(false)}
+                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-4 rounded-xl transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

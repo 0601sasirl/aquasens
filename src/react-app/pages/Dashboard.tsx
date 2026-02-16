@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '@/react-app/contexts/SettingsContext';
-import { Droplets, Activity, Beaker, Thermometer, AlertTriangle, Bell, BellOff } from 'lucide-react';
+import { Droplets, Activity, Beaker, Thermometer, AlertTriangle, Bell, BellOff, Download } from 'lucide-react';
 import Logo, { WaterWaveIllustration } from '../components/Logo';
+import { generateWaterQualityReport } from '../lib/exportReport';
 
 interface SensorData {
   ph: number;
@@ -32,11 +33,9 @@ export default function Dashboard() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
 
-  // Check if water quality is safe
   const checkWaterSafety = (data: SensorData) => {
     const newAlerts: Alert[] = [];
 
-    // pH check (safe range: 6.5-8.5)
     if (data.ph < 6.5 || data.ph > 8.5) {
       newAlerts.push({
         id: `ph-${Date.now()}`,
@@ -47,7 +46,6 @@ export default function Dashboard() {
       });
     }
 
-    // TDS check (safe: <300 ppm)
     if (data.tds > 300) {
       newAlerts.push({
         id: `tds-${Date.now()}`,
@@ -58,7 +56,6 @@ export default function Dashboard() {
       });
     }
 
-    // Turbidity check (safe: <5 NTU)
     if (data.turbidity > 5) {
       newAlerts.push({
         id: `turbidity-${Date.now()}`,
@@ -69,7 +66,6 @@ export default function Dashboard() {
       });
     }
 
-    // Temperature check (safe: 15-25°C)
     if (data.temperature < 15 || data.temperature > 25) {
       newAlerts.push({
         id: `temp-${Date.now()}`,
@@ -89,7 +85,6 @@ export default function Dashboard() {
     setTimeout(() => setIsLoading(false), 1500);
 
     const interval = setInterval(() => {
-      // Simulate occasional unsafe values for demo
       const randomEvent = Math.random();
       const newData = {
         ph: randomEvent < 0.1 ? +(5.5 + Math.random() * 1).toFixed(2) : +(7.0 + Math.random() * 0.5).toFixed(2),
@@ -100,12 +95,10 @@ export default function Dashboard() {
 
       setSensorData(newData);
 
-      // Check for safety issues
       const newAlerts = checkWaterSafety(newData);
       if (newAlerts.length > 0 && alertsEnabled) {
-        setAlerts(prev => [...newAlerts, ...prev].slice(0, 10)); // Keep last 10 alerts
+        setAlerts(prev => [...newAlerts, ...prev].slice(0, 10));
         
-        // Browser notification
         if (Notification.permission === 'granted') {
           new Notification('⚠️ Water Quality Alert', {
             body: newAlerts[0].message,
@@ -114,7 +107,6 @@ export default function Dashboard() {
         }
       }
 
-      // Calculate quality score
       let score = 100;
       if (newData.ph < 6.5 || newData.ph > 8.5) score -= 20;
       if (newData.tds > 300) score -= 20;
@@ -126,7 +118,6 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [settings.demoMode, alertsEnabled]);
 
-  // Request notification permission on mount
   useEffect(() => {
     if (Notification.permission === 'default') {
       Notification.requestPermission();
@@ -148,10 +139,22 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <Logo size="xl" />
-          <div className="mt-6 flex justify-center">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          
+          <div className="mt-8 flex justify-center">
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                <div className="w-4 h-4 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+            </div>
           </div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading water quality data...</p>
+          
+          <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium">Loading water quality data...</p>
+          
+          <div className="mt-4 w-64 mx-auto bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full animate-pulse"></div>
+          </div>
         </div>
       </div>
     );
@@ -159,7 +162,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
-      {/* Header with Logo and Alert Bell */}
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Logo size="lg" />
@@ -172,7 +174,22 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Alert Bell */}
+            <button
+              onClick={() => {
+                generateWaterQualityReport({
+                  sensorData,
+                  qualityScore,
+                  timestamp: new Date(),
+                  alerts: alerts.length,
+                  deviceName: settings.demoMode ? 'Demo Mode' : 'ESP32 Sensor'
+                });
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            
             <button
               onClick={() => setShowAlerts(!showAlerts)}
               className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -191,7 +208,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Alerts Dropdown */}
         {showAlerts && (
           <div className="absolute right-4 top-16 w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -259,7 +275,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Active Alert Banner */}
       {hasActiveAlerts && (
         <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-3">
           <div className="max-w-7xl mx-auto flex items-center gap-3">
@@ -272,7 +287,6 @@ export default function Dashboard() {
       )}
 
       <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Rest of your Dashboard code stays the same... */}
         <div className="relative">
           <div className="absolute inset-0 overflow-hidden rounded-3xl">
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl"></div>
@@ -348,7 +362,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Sensor Cards Grid - keeping your existing code */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600">
             <div className="p-6">
