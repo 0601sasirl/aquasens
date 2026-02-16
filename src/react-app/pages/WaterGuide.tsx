@@ -287,7 +287,7 @@ export default function WaterGuide() {
               </div>
               <div className="text-left">
                 <div className="font-semibold text-gray-900 dark:text-white text-sm">Email Support</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">support@hydrotech.app</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">support@aquasens.app</div>
               </div>
             </button>
           </div>

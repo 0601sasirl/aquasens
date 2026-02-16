@@ -25,7 +25,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SettingsData>(defaultSettings);
 
   useEffect(() => {
-    const savedSettings = localStorage.getItem('hydrotech-settings');
+    const savedSettings = localStorage.getItem('aquasens-settings');
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
@@ -45,7 +45,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateSettings = (newSettings: Partial<SettingsData>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
-      localStorage.setItem('hydrotech-settings', JSON.stringify(updated));
+      localStorage.setItem('aquasens-settings', JSON.stringify(updated));
       
       if ('darkMode' in newSettings) {
         if (newSettings.darkMode) {
